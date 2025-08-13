@@ -227,16 +227,20 @@ async def _eval_b64_json_async(elisp_data_expr: str, timeout_seconds: Optional[f
 
 async def get_visible_text_async(timeout_seconds: Optional[float] = None) -> VisibleText:
     elisp_alist = """
-      (let* ((ws (window-start))
-             (we (window-end nil t))
-             (beg (max (point-min) ws))
-             (end (min (point-max) we))
-             (beg (min beg end))
-             (end (max beg end))
-             (s (buffer-substring-no-properties beg end)))
-        (list (cons 'text s)
-              (cons 'start beg)
-              (cons 'end end)))
+      (with-selected-window (selected-window)
+        (with-current-buffer (window-buffer (selected-window))
+          (let* ((ws (window-start))
+                 (we (window-end nil t))
+                 (beg (max (point-min) ws))
+                 (end (min (point-max) we))
+                 (beg (min beg end))
+                 (end (max beg end))
+                 (s (if (and beg end (<= beg end) (<= end (point-max)))
+                        (buffer-substring-no-properties beg end)
+                      (buffer-string))))
+            (list (cons 'text s)
+                  (cons 'start beg)
+                  (cons 'end end)))))
     """.strip()
 
     data = await _eval_b64_json_async(elisp_alist, timeout_seconds)
@@ -293,9 +297,15 @@ async def get_context_async(timeout_seconds: Optional[float] = None) -> Dict[str
     return await _eval_b64_json_async(elisp_alist, timeout_seconds)
 
 
+app = FastMCP(name="emacs-mcp-server")
+
+
 @app.tool(
     name="emacs_list_buffers",
-    description="List open buffers with name, file path (if any), modified flag, and whether it is the current buffer.",
+    description=(
+        "List open buffers with name, file path (if any), modified flag, and whether it is the current buffer. "
+        "Returns: {success: bool, buffers?: [...], error?: string}"
+    ),
 )
 async def emacs_list_buffers() -> Dict[str, Any]:
     """Return a list of open buffers and their basic metadata.
@@ -315,13 +325,9 @@ async def emacs_list_buffers() -> Dict[str, Any]:
     """.strip()
     try:
         items = await _eval_b64_json_async(elisp, _get_timeout_seconds(None))
-        # Convert any Emacs nil file to None in Python occurs via JSON null already
         return {"success": True, "buffers": items}
     except EmacsError as exc:
         return {"success": False, "error": str(exc)}
-
-
-app = FastMCP(name="emacs-mcp-server")
 
 
 @app.tool(
@@ -338,7 +344,10 @@ async def emacs_eval(expr: str) -> Dict[str, Any]:
 
 @app.tool(
     name="emacs_get_visible_text",
-    description="Get the text currently visible in the selected Emacs window.",
+    description=(
+        "Get the text currently visible in the selected Emacs window. "
+        "Returns: {success: bool, text?: string, start?: number, end?: number, error?: string}"
+    ),
 )
 async def emacs_get_visible_text() -> Dict[str, Any]:
     try:
@@ -352,7 +361,8 @@ async def emacs_get_visible_text() -> Dict[str, Any]:
 @app.tool(
     name="emacs_get_context",
     description=(
-        "Get contextual information about the Emacs state: buffer name, file name, mode, point, line/column, modified, narrowed, window start/end, project root, and list of buffers."
+        "Get contextual information about the Emacs state: buffer name, file name, mode, point, line/column, modified, narrowed, window start/end, project root, and list of buffers. "
+        "Returns: {success: bool, context?: {...}, error?: string}"
     ),
 )
 async def emacs_get_context() -> Dict[str, Any]:

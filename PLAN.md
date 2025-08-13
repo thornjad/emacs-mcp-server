@@ -124,6 +124,9 @@ This should run locally without Docker, be packaged with `uv`, and use the `fast
 - [x] Added tool: `emacs_list_buffers`
 - [x] Improved project root detection fallbacks
 - [x] Startup check retry
+- [x] Window targeting: added explicit `(with-selected-window ...)(with-current-buffer ...)` for visible text; audited context
+- [x] Fixed decorator ordering for `emacs_list_buffers` and enhanced tool descriptions with response envelopes
+- [x] Tests expanded: window targeting presence, malformed base64/JSON path, timeout propagation
 - [ ] Multi-window targeting (deferred)
 
 ### Run instructions (after implementation)
