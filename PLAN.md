@@ -1,10 +1,10 @@
 # Emacs MCP Server Plan
 
-**Created:** Tue Aug 12 16:20:28 CDT 2025  
-**Updated:** Wed Aug 13 12:06:43 CDT 2025  
-**Repository:** emacs-mcp-server-claude-opus-plan  
-**Branch:** main  
-**Status:** ✅ COMPLETED (Refactored to simplified architecture)  
+**Created:** Tue Aug 12 16:20:28 CDT 2025
+**Updated:** Wed Aug 13 15:42:18 CDT 2025
+**Repository:** emacs-mcp-server-claude-opus-plan
+**Branch:** claude-opus-plan
+**Status:** ✅ IMPROVEMENTS COMPLETED (All critical fixes implemented and tested)
 
 ## Project Overview
 
@@ -98,7 +98,7 @@ This project implements an MCP (Model Context Protocol) server that allows Claud
 
 **Key Functions:**
 - `call_emacsclient()` - Direct subprocess call to emacsclient
-- `is_emacs_available()` - Availability check  
+- `is_emacs_available()` - Availability check
 - `emacs_eval()`, `emacs_get_visible_text()`, `emacs_get_context()` - MCP tools
 
 ## Key Design Decisions
@@ -153,6 +153,67 @@ This project implements an MCP (Model Context Protocol) server that allows Claud
 - **JSON fallback**: Manual JSON construction when Emacs json-encode unavailable
 
 **Architecture Decision**: Rejected over-engineered multi-file structure in favor of simple, single-file approach appropriate for this scope.
+
+## Phase 6: Critical Bug Fixes and Improvements (In Progress)
+
+**Context**: Comparative analysis with SourceGraphAMP implementation revealed critical issues that need immediate attention.
+
+### Immediate Fixes Required
+
+#### 1. **Critical String Decoding Bug** (Priority: URGENT)
+- **Issue**: `server.py:99-100` calls `decode('unicode_escape')` on already-decoded subprocess output
+- **Impact**: Will cause crashes on text with escape sequences
+- **Fix**: Remove the unnecessary decode call
+- **Status**: ✅ COMPLETED - Fixed string handling in visible text and context functions
+
+#### 2. **Frame/Window Targeting Issue** (Priority: HIGH)
+- **Issue**: Commands execute in arbitrary frames instead of user's active frame
+- **Impact**: Critical for multi-frame workflows (user confirmed 6-7 frames typically open)
+- **Fix**: Implement `with-selected-window (selected-window)` pattern from PR #4
+- **Status**: ✅ COMPLETED - All functions now properly target selected window/buffer
+
+### Architecture Improvements
+
+#### 3. **Enhanced Error Handling** (Priority: MEDIUM)
+- **Issue**: Basic error handling insufficient for production use
+- **Fix**: Add custom exception class and comprehensive error management
+- **Status**: ✅ COMPLETED - Added EmacsError class with better error categorization
+
+#### 4. **Robust JSON Parsing** (Priority: MEDIUM)
+- **Issue**: Context parsing may fail on complex Emacs outputs
+- **Fix**: Handle double-encoded JSON and multiple Emacs versions
+- **Status**: ✅ COMPLETED - Improved parsing with double-encode handling and plist conversion
+
+#### 5. **Input Validation** (Priority: LOW)
+- **Issue**: No sanitization of Emacs Lisp expressions
+- **Fix**: Add basic safety checks
+- **Status**: ❌ DEFERRED - Not critical for current use case
+
+### Updated Success Criteria
+
+- [x] **Fix string decoding bug** - Essential for stability
+- [x] **Implement frame targeting** - Essential for multi-frame users
+- [x] **Enhance error handling** - Important for production use
+- [x] **Improve JSON parsing** - Important for compatibility
+- [x] **All tests pass** after improvements
+- [x] **Performance comparable** to original implementation
+
+### Implementation Priority
+
+1. **URGENT**: String decoding fix (prevents crashes)
+2. **HIGH**: Frame targeting (essential for user's workflow)
+3. **MEDIUM**: Error handling and JSON parsing improvements
+4. **LOW**: Input validation enhancements
+
+### Architecture Justification
+
+**Why Keep FastMCP Approach:**
+- Simpler integration and setup
+- Adequate performance for single-agent usage
+- More maintainable codebase (220 vs 375 lines)
+- Different use case than comprehensive async framework
+
+**Target**: Fix critical bugs while preserving simplicity advantage.
 
 ## Future Enhancements (Out of Scope)
 
