@@ -193,3 +193,92 @@ Both enhanced functions tested successfully with live Emacs:
 - **Fallback compatibility**: Graceful handling when `json-encode` not available
 
 The implementation transforms the MCP server from providing human-readable strings to machine-optimized structured data, making it significantly more useful and efficient for AI agents.
+
+## Synthesis Plan: Architectural Improvements 
+**Updated**: Wed Aug 13 15:44:04 CDT 2025
+
+After analysis and collaboration with the Cursor IDE implementation (PR #6), the following improvements are planned to create a superior hybrid solution:
+
+### Phase 1: Replace Base64 with Proper JSON Escaping ✅
+**Current Issue**: Base64 encoding adds unnecessary complexity while solving the JSON escaping problem
+**Solution**: Replace base64 approach with Python's built-in `json.dumps()` for automatic text escaping
+**Benefits**: 
+- Simpler code maintenance
+- More readable JSON output
+- Same reliability for special characters
+- Standard approach for JSON text handling
+
+### Phase 2: Convert to Async Architecture ✅
+**Current Issue**: Blocking `subprocess.run()` calls prevent concurrent operations
+**Solution**: Convert to `asyncio.create_subprocess_exec()` with full async/await pattern
+**Benefits**:
+- Non-blocking I/O operations
+- Support for concurrent MCP tool calls
+- Better scalability for production use
+- Prevents server blocking on long-running Emacs operations
+
+### Phase 3: Enhanced Error Handling & Configurable Timeouts ✅
+**Current Issues**: 
+- Hardcoded 30-second timeouts
+- Generic error messages
+**Solutions**:
+- User-configurable timeouts with sensible defaults (5s for eval, 10s for text)
+- Specific connection diagnostics
+- Better guidance for server startup issues
+**Benefits**:
+- Better user experience
+- Easier debugging
+- Flexibility for different use cases
+
+### Phase 4: Modular Structure (Optional) ✅
+**Current**: Single file approach
+**Future**: Split into 2-3 focused modules:
+- `emacs_client.py`: Core Emacs communication
+- `emacs_mcp.py`: MCP server and tools
+- Keep simple structure (not the 4+ files from PR #6)
+
+### Implementation Priority
+1. **Phase 1** (Critical): Fix text encoding approach
+2. **Phase 2** (Critical): Add async support  
+3. **Phase 3** (Important): Improve UX
+4. **Phase 4** (Nice-to-have): Modular structure
+
+This synthesis combines the working text encoding solution with modern async architecture to create a production-ready MCP server.
+
+## Implementation Status: ✅ ALL PHASES COMPLETED
+**Final Update**: Wed Aug 13 15:49:56 CDT 2025
+
+All synthesis improvements have been successfully implemented:
+
+### ✅ Phase 1: JSON Escaping Improvement  
+- Replaced base64 encoding with Python's `json.dumps()` for proper text escaping
+- Simplified code while maintaining reliability for special characters
+- More readable JSON output with standard escaping approach
+
+### ✅ Phase 2: Async Architecture  
+- Converted all functions to async/await pattern using `asyncio.create_subprocess_exec()`
+- Non-blocking I/O operations enable concurrent MCP tool calls
+- Better scalability and prevents server blocking on long operations
+
+### ✅ Phase 3: Enhanced UX
+- Added configurable timeouts (5s eval, 10s text, 5s context)
+- Detailed error messages with troubleshooting steps
+- Specific diagnostics for connection issues
+- Fixed bug in narrowed buffer detection
+
+### ✅ Phase 4: Modular Structure
+- Split into focused modules:
+  - `emacs_client.py`: Core Emacs communication and utilities
+  - `mcp_server.py`: MCP server implementation with all tools
+  - `emacs_mcp.py`: Main entry point
+- Clean separation of concerns while maintaining simplicity
+
+### Final Benefits Achieved
+
+✅ **Superior Text Handling**: Python's json.dumps() properly escapes all special characters  
+✅ **Async Architecture**: Non-blocking operations support concurrent tool calls  
+✅ **User-Friendly**: Configurable timeouts and detailed error guidance  
+✅ **Production Ready**: Clean modular structure with proper error handling  
+✅ **Best of Both Worlds**: Combines PR #6's architectural strengths with working text encoding
+
+The implementation successfully synthesizes the best ideas from both approaches while addressing all identified limitations.
