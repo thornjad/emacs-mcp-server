@@ -35,15 +35,19 @@ async def run_emacsclient(expression: str, timeout: int = 10) -> str:
     """
     Execute an Emacs Lisp expression using emacsclient.
     
+    This function uses asyncio subprocess for non-blocking execution and proper
+    timeout handling. Each call creates a new process connection to emacsclient,
+    which handles the actual connection to the Emacs server efficiently.
+    
     Args:
         expression: The Emacs Lisp expression to evaluate
-        timeout: Timeout in seconds
+        timeout: Timeout in seconds (default: 10)
         
     Returns:
         The result of the expression as a string
         
     Raises:
-        EmacsError: If the command fails or times out
+        EmacsError: If the command fails, times out, or Emacs server is unavailable
     """
     try:
         # Use emacsclient with -e to execute the expression in the selected frame
@@ -69,7 +73,18 @@ async def run_emacsclient(expression: str, timeout: int = 10) -> str:
         if process.returncode != 0:
             error_msg = stderr.decode('utf-8').strip()
             if "server file" in error_msg or "connect" in error_msg:
-                raise EmacsError("Emacs server not running. Start Emacs with M-x server-start")
+                raise EmacsError(
+                    "Emacs server not running. To fix this:\n"
+                    "1. Start Emacs\n"
+                    "2. Run: M-x server-start\n"
+                    "3. Or add (server-start) to your Emacs config\n"
+                    "4. Ensure emacsclient is in your PATH"
+                )
+            elif "not found" in error_msg.lower():
+                raise EmacsError(
+                    f"emacsclient command failed: {error_msg}\n"
+                    "Try: brew install emacs (macOS) or apt-get install emacs (Linux)"
+                )
             else:
                 raise EmacsError(f"emacsclient failed: {error_msg}")
         
@@ -78,11 +93,17 @@ async def run_emacsclient(expression: str, timeout: int = 10) -> str:
         return result
         
     except FileNotFoundError:
-        raise EmacsError("emacsclient not found. Is Emacs installed?")
+        raise EmacsError(
+            "emacsclient not found in PATH.\n"
+            "Install Emacs:\n"
+            "- macOS: brew install emacs\n"
+            "- Linux: apt-get install emacs or yum install emacs\n"
+            "- Windows: Download from https://www.gnu.org/software/emacs/"
+        )
     except Exception as e:
         if isinstance(e, EmacsError):
             raise
-        raise EmacsError(f"Unexpected error: {str(e)}")
+        raise EmacsError(f"Unexpected error communicating with Emacs: {str(e)}")
 
 
 async def eval_elisp(expression: str) -> str:
@@ -91,7 +112,22 @@ async def eval_elisp(expression: str) -> str:
 
 
 async def get_visible_text() -> str:
-    """Get the text currently visible in the active Emacs window."""
+    """Get the text currently visible in the active Emacs window.
+    
+    This function explicitly targets the selected window and buffer to ensure 
+    commands execute in the user's active context, not the Emacs server buffer.
+    
+    The window targeting prevents a critical bug where commands might execute
+    in the wrong buffer context, which was identified in comparative analysis.
+    
+    Returns:
+        str: The visible text content in the active window, bounded by 
+             window-start and window-end positions. Falls back to full
+             buffer content if window bounds are invalid.
+             
+    Raises:
+        EmacsError: If emacsclient communication fails or times out
+    """
     expression = """
 (with-selected-window (selected-window)
   (with-current-buffer (window-buffer (selected-window))
@@ -105,7 +141,36 @@ async def get_visible_text() -> str:
 
 
 async def get_context() -> Dict[str, Any]:
-    """Get comprehensive context about the current Emacs state."""
+    """Get comprehensive context about the current Emacs state.
+    
+    This function uses explicit window/buffer targeting and handles Emacs'
+    double-encoded JSON output robustly. It supports both modern JSON encoding
+    and legacy plist formats for maximum compatibility.
+    
+    Key features:
+    - Explicit window targeting prevents execution in wrong buffer context
+    - Double-encoded JSON handling for reliable parsing
+    - Fallback graceful degradation when JSON parsing fails
+    - Support for both dictionary and plist response formats
+    
+    Returns:
+        Dict[str, Any]: Context information including:
+            - buffer_name: Name of current buffer
+            - file_name: File path if buffer is visiting a file
+            - major_mode: Current major mode name
+            - minor_modes: List of active minor modes
+            - point: Current cursor position
+            - line_number: Current line number (1-indexed)
+            - column_number: Current column number (0-indexed)
+            - mark_active: Whether text selection is active
+            - buffer_modified: Whether buffer has unsaved changes
+            - buffer_size: Total buffer size in characters
+            - window_start/end: Visible text boundaries
+            - buffer_list: Names of all open buffers
+            
+    Raises:
+        EmacsError: If emacsclient communication fails or times out
+    """
     # Build a comprehensive Emacs Lisp expression to gather context
     # Make sure we get info from the selected window and buffer
     expression = """
@@ -277,8 +342,13 @@ async def handle_call_tool(name: str, arguments: dict[str, Any] | None) -> list[
     if not await check_emacs_available():
         return [
             types.TextContent(
-                type="text",
-                text="Error: Emacs server not available. Please start Emacs and run M-x server-start"
+                type="text", 
+                text="Error: Emacs server not available.\n\n"
+                     "Quick setup:\n"
+                     "1. Start Emacs: emacs or open Emacs application\n"
+                     "2. Enable server: M-x server-start (or add to config)\n"
+                     "3. Test connection: emacsclient --eval '(+ 1 1)'\n\n"
+                     "For persistent setup, add (server-start) to your ~/.emacs or init.el"
             )
         ]
 

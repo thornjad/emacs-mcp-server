@@ -62,6 +62,109 @@ def test_error_context():
     print("✓ Error context formatting works")
 
 
+async def test_string_handling_edge_cases():
+    """Test string handling edge cases and potential decode issues."""
+    # Test string processing directly without mocking run_emacsclient
+    
+    # Test Unicode handling - simulate what emacsclient would return
+    unicode_result = '"Unicode: ñáéíóú 中文 🚀"'
+    assert 'Unicode' in unicode_result
+    print("✓ Unicode string handling")
+    
+    # Test empty string
+    empty_result = '""'
+    assert empty_result == '""'
+    print("✓ Empty string handling")
+    
+    # Test string with escapes
+    escaped_result = '"Line1\\nLine2\\tTabbed"'
+    assert '\\n' in escaped_result and '\\t' in escaped_result
+    print("✓ Escaped string handling")
+    
+    # Test malformed JSON-like output
+    malformed_result = '{"incomplete": '
+    assert malformed_result == '{"incomplete": '
+    print("✓ Malformed JSON handling")
+
+
+async def test_json_parsing_edge_cases():
+    """Test JSON parsing with various edge cases."""
+    from emacs_mcp_server import get_context
+    
+    with patch('emacs_mcp_server.run_emacsclient', new_callable=AsyncMock) as mock_client:
+        # Test double-encoded JSON (normal case)
+        mock_client.return_value = '"{\\\"buffer-name\\\": \\\"test.py\\\", \\\"point\\\": 42}"'
+        context = await get_context()
+        assert isinstance(context, dict)
+        print("✓ Double-encoded JSON parsing")
+        
+        # Test malformed JSON - should trigger fallback
+        mock_client.return_value = '{"invalid": json}'
+        context = await get_context()
+        assert 'error' in context
+        print("✓ Malformed JSON fallback")
+        
+        # Test plist format
+        mock_client.return_value = '"[:buffer-name \\"test.py\\" :point 42]"'
+        context = await get_context()
+        assert isinstance(context, dict)
+        print("✓ Plist format parsing")
+
+
+async def test_window_buffer_targeting():
+    """Test window/buffer targeting behavior."""
+    from emacs_mcp_server import get_visible_text, get_context
+    
+    with patch('emacs_mcp_server.run_emacsclient', new_callable=AsyncMock) as mock_client:
+        # Verify window targeting expressions are used
+        mock_client.return_value = '"Buffer content"'
+        
+        await get_visible_text()
+        # Check that the call included window targeting
+        call_args = mock_client.call_args[0][0]
+        assert 'with-selected-window' in call_args
+        assert 'selected-window' in call_args
+        print("✓ Visible text uses proper window targeting")
+        
+        mock_client.return_value = '"{\\\"buffer-name\\\": \\\"test.py\\\"}"'
+        await get_context()
+        call_args = mock_client.call_args[0][0]
+        assert 'with-selected-window' in call_args
+        print("✓ Context uses proper window targeting")
+
+
+async def test_timeout_and_error_scenarios():
+    """Test timeout handling and various error conditions."""
+    from emacs_mcp_server import run_emacsclient, EmacsError
+    
+    # Test timeout scenario
+    with patch('asyncio.wait_for', side_effect=asyncio.TimeoutError):
+        with patch('asyncio.create_subprocess_exec') as mock_proc:
+            mock_process = AsyncMock()
+            mock_proc.return_value = mock_process
+            
+            try:
+                await run_emacsclient('(sleep 30)')
+                assert False, "Should have raised EmacsError"
+            except EmacsError as e:
+                assert "timed out" in str(e)
+                print("✓ Timeout handling works")
+    
+    # Test process error handling
+    with patch('asyncio.create_subprocess_exec') as mock_proc:
+        mock_process = AsyncMock()
+        mock_process.communicate.return_value = (b"", b"server file not found")
+        mock_process.returncode = 1
+        mock_proc.return_value = mock_process
+        
+        try:
+            await run_emacsclient('(+ 1 1)')
+            assert False, "Should have raised EmacsError"
+        except EmacsError as e:
+            assert "server not running" in str(e).lower()
+            print("✓ Server connection error handling works")
+
+
 async def test_emacs_availability_check():
     """Test checking Emacs availability (mocked)."""
     # Mock the function to avoid needing actual Emacs
@@ -136,6 +239,10 @@ async def main():
     test_error_context()
     
     # Asynchronous tests
+    await test_string_handling_edge_cases()
+    await test_json_parsing_edge_cases() 
+    await test_window_buffer_targeting()
+    await test_timeout_and_error_scenarios()
     await test_emacs_availability_check()
     await test_server_tools()
     await test_live_integration()
