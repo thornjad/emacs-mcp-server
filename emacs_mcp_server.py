@@ -9,7 +9,7 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, List, Optional
 
 from fastmcp import FastMCP
 
@@ -17,6 +17,7 @@ __version__ = "0.1.0"
 
 
 class EmacsError(RuntimeError):
+    """Raised when an Emacs interaction fails in a recoverable way."""
     pass
 
 
@@ -59,7 +60,7 @@ def _run_emacsclient_eval(expr: str, timeout_seconds: float = 5.0) -> Tuple[str,
 
 
 async def _run_emacsclient_eval_async(
-    expr: str, timeout_seconds: float | None = None
+    expr: str, timeout_seconds: Optional[float] = None
 ) -> Tuple[str, str, int]:
     """Run emacsclient asynchronously and return (stdout, stderr, returncode)."""
     command = [_resolve_emacsclient(), "-e", expr]
@@ -94,7 +95,7 @@ def evaluate(expr: str, timeout_seconds: float = 5.0) -> str:
     return stdout
 
 
-async def evaluate_async(expr: str, timeout_seconds: float | None = None) -> str:
+async def evaluate_async(expr: str, timeout_seconds: Optional[float] = None) -> str:
     stdout, stderr, code = await _run_emacsclient_eval_async(expr, timeout_seconds)
     if code != 0 or (stderr and not stdout):
         raise EmacsError(f"Emacs eval error: {stderr or stdout}")
@@ -200,7 +201,7 @@ def get_context(timeout_seconds: float = 5.0) -> Dict[str, Any]:
     return _eval_b64_json(elisp_alist, timeout_seconds)
 
 
-async def _eval_b64_json_async(elisp_data_expr: str, timeout_seconds: float | None = None) -> Any:
+async def _eval_b64_json_async(elisp_data_expr: str, timeout_seconds: Optional[float] = None) -> Any:
     elisp = f"""
     (let* ((data {elisp_data_expr})
            (json-str (progn (require 'json) (json-encode data)))
@@ -224,7 +225,7 @@ async def _eval_b64_json_async(elisp_data_expr: str, timeout_seconds: float | No
         raise EmacsError(f"Failed to decode Emacs JSON: {exc}") from exc
 
 
-async def get_visible_text_async(timeout_seconds: float | None = None) -> VisibleText:
+async def get_visible_text_async(timeout_seconds: Optional[float] = None) -> VisibleText:
     elisp_alist = """
       (let* ((ws (window-start))
              (we (window-end nil t))
@@ -242,7 +243,7 @@ async def get_visible_text_async(timeout_seconds: float | None = None) -> Visibl
     return VisibleText(text=data["text"], start=int(data["start"]), end=int(data["end"]))
 
 
-async def get_context_async(timeout_seconds: float | None = None) -> Dict[str, Any]:
+async def get_context_async(timeout_seconds: Optional[float] = None) -> Dict[str, Any]:
     elisp_alist = """
       (condition-case err
           (let* ((win
@@ -290,6 +291,34 @@ async def get_context_async(timeout_seconds: float | None = None) -> Dict[str, A
     """.strip()
 
     return await _eval_b64_json_async(elisp_alist, timeout_seconds)
+
+
+@app.tool(
+    name="emacs_list_buffers",
+    description="List open buffers with name, file path (if any), modified flag, and whether it is the current buffer.",
+)
+async def emacs_list_buffers() -> Dict[str, Any]:
+    """Return a list of open buffers and their basic metadata.
+
+    Response: { success: bool, buffers?: Array<{ name: str, file: str|None, modified: bool, current: bool }>, error?: str }
+    """
+    elisp = """
+      (let* ((cur (buffer-name))
+             (items (mapcar (lambda (b)
+                              (with-current-buffer b
+                                (list (cons 'name (buffer-name b))
+                                      (cons 'file (ignore-errors (buffer-file-name b)))
+                                      (cons 'modified (buffer-modified-p b))
+                                      (cons 'current (string= (buffer-name b) cur)))))
+                            (buffer-list))))
+        items)
+    """.strip()
+    try:
+        items = await _eval_b64_json_async(elisp, _get_timeout_seconds(None))
+        # Convert any Emacs nil file to None in Python occurs via JSON null already
+        return {"success": True, "buffers": items}
+    except EmacsError as exc:
+        return {"success": False, "error": str(exc)}
 
 
 app = FastMCP(name="emacs-mcp-server")
@@ -355,7 +384,7 @@ def smoke() -> None:
         print("Encountered EmacsError:", exc)
 
 
-async def _check_emacs_connection(timeout_seconds: float | None = None) -> bool:
+async def _check_emacs_connection(timeout_seconds: Optional[float] = None) -> bool:
     try:
         stdout, stderr, code = await _run_emacsclient_eval_async("t", timeout_seconds)
         return code == 0
@@ -380,7 +409,15 @@ def main() -> None:
         return
 
     # Optional startup connectivity check
+    # Optional startup connectivity check with brief retry
     ok = asyncio.run(_check_emacs_connection(_get_timeout_seconds(None)))
+    if not ok:
+        # Retry once after a short delay to smooth transient startup issues
+        try:
+            asyncio.run(asyncio.sleep(0.2))
+        except RuntimeError:
+            pass
+        ok = asyncio.run(_check_emacs_connection(_get_timeout_seconds(None)))
     if not ok:
         msg = (
             "Warning: cannot connect to Emacs. Ensure Emacs is running, the server is started, and emacsclient is on PATH."

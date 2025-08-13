@@ -103,6 +103,29 @@ This should run locally without Docker, be packaged with `uv`, and use the `fast
 - [x] Unit tests (mocked) and optional integration tests (integration optional)
 - [ ] Docs updated (`README.md`, flags, response shapes)
 
+### Additional improvement plan (review follow-ups)
+- Documentation enhancements:
+  - Expand README with response schema examples and common tool usage
+  - Add configuration guide for CLI flags and environment variables
+- Code quality:
+  - Standardize docstrings and error message formats
+  - Ensure public functions have precise type hints
+- Functional:
+  - New tool `emacs_list_buffers` returning buffers with name/file/modified/current
+  - Enhance project root detection: fall back to `vc-root-dir`/`.git` if `(project-current)` is unavailable
+  - Optional: multi-window targeting parameters (defer)
+- Robustness:
+  - Startup connection check: brief retry for transient failures
+  - Ensure subprocess cleanup on all error paths (timeouts already kill the process)
+
+### Additional progress
+- [x] README expanded (response schema, examples, configuration)
+- [x] Docstrings and error formats standardized
+- [x] Added tool: `emacs_list_buffers`
+- [x] Improved project root detection fallbacks
+- [x] Startup check retry
+- [ ] Multi-window targeting (deferred)
+
 ### Run instructions (after implementation)
 - Ensure Python 3.12 and `uv` are installed
 - Install deps and run:
