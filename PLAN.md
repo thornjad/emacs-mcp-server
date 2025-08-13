@@ -63,7 +63,7 @@ This should run locally without Docker, be packaged with `uv`, and use the `fast
    - `emacs_mcp_server.py` at repo root containing both the FastMCP server and the Emacs bridge helpers
 3. Emacs bridge (inside the same file)
    - Resolve `emacsclient` binary (env `EMACSCLIENT` or default `emacsclient`)
-   - Implement `evaluate(expr: str) -> str` returning printed Lisp result
+   - Implement `evaluate(expr: str)` returning printed Lisp result
    - Implement base64+JSON helpers for structured results and functions for visible text and context
 4. Tools via fastmcp (in the same file)
    - Register the three tools and map them to the bridge helpers
@@ -73,6 +73,16 @@ This should run locally without Docker, be packaged with `uv`, and use the `fast
    - Document environment requirements (starting Emacs server, etc.)
 6. Lightweight testing
    - Provide a simple `--smoke` CLI flag or a small internal `smoke()` function callable via `uv run python -c "import emacs_mcp_server as m; m.smoke()"`
+
+### Improvement plan (post-review)
+- Non-blocking subprocess: replace blocking `subprocess.run` with `asyncio.create_subprocess_exec` and `asyncio.wait_for`
+- Optional startup health check: warn by default; fail-fast with `--strict-startup`
+- Timeout configuration: `--timeout` CLI flag and `EMACSCLIENT_TIMEOUT` env with sane defaults
+- Response envelope: add top-level `success: bool` across all tools; keep domain fields on success, `{error}` on failure
+- Context `project_root`: implement via `(project-current)` when available, or remove from description
+- Window fallback: keep visible-frame selection; add selected-window fallback if detection fails
+- Tests: unit tests with mocks; optional integration tests guarded by marker
+- Docs: switch `pyproject.toml` readme to `README.md`; document flags, env, and response shapes
 
 ### Progress
 - [x] Single-file layout chosen and documented
@@ -84,6 +94,14 @@ This should run locally without Docker, be packaged with `uv`, and use the `fast
   - `emacs_eval` returns Lisp results
   - `emacs_get_visible_text` returns visible region and bounds
   - `emacs_get_context` returns `buffer_name`, `buffer_file_name`, and correct `line` for the selected window and buffer
+- [x] Non-blocking subprocess (async)
+- [x] Optional startup health check (`--strict-startup`)
+- [x] Configurable timeouts (`--timeout`, `EMACSCLIENT_TIMEOUT`)
+- [x] Response envelope with `success`
+- [x] Context `project_root` implemented (when available via `(project-current)`) and described
+- [x] Window fallback path
+- [x] Unit tests (mocked) and optional integration tests (integration optional)
+- [ ] Docs updated (`README.md`, flags, response shapes)
 
 ### Run instructions (after implementation)
 - Ensure Python 3.12 and `uv` are installed
