@@ -15,7 +15,7 @@ uv venv -p 3.12
 uv sync
 ```
 
-Verify your Emacs connection:
+[Optional] Verify your Emacs connection:
 ```bash
 uv run emacs-mcp-server --smoke
 ```
@@ -34,24 +34,30 @@ emacs-mcp-server --smoke
 ```
 If `emacs-mcp-server` is not found after installation, ensure your pipx bin directory is on `PATH` and/or run `which emacs-mcp-server` to get the absolute path for use in client config.
 
-### Configuration: Claude Code (VS Code)
-Claude Code can launch MCP servers for you.
+### Configuration: Claude Code CLI
+Claude Code’s CLI can load MCP servers from simple JSON specs. Create a server spec named `emacs.json` with the command you prefer (uv or a direct binary):
 
-1) In VS Code, open Settings and search for “Model Context Protocol Servers” under the Claude extension.
-2) Add a new server with the following fields:
-   - **Name**: `emacs`
-   - **Command** (pick one):
-     - If using uv: `uv`
-     - If using pipx or a venv: full path from `which emacs-mcp-server`
-   - **Args** (choose one set):
-     - If using uv: `run`, `emacs-mcp-server`
-     - If using a direct binary: leave empty
-   - **Environment** (optional):
-     - `EMACSCLIENT`: path to `emacsclient` if it’s not on `PATH`
-     - `EMACSCLIENT_TIMEOUT`: seconds, e.g. `5.0`
-   - **Stdio**: enabled (default for MCP servers)
+```json
+{
+  "name": "emacs",
+  "command": "uv",
+  "args": ["run", "emacs-mcp-server"],
+  "env": {
+    "EMACSCLIENT": "emacsclient",
+    "EMACSCLIENT_TIMEOUT": "5.0"
+  },
+  "stdio": true
+}
+```
 
-Tip: You can test quickly by asking Claude to list open buffers or evaluate a simple Emacs Lisp form after adding the server.
+Place this file in the CLI’s MCP servers directory, then restart the CLI:
+- macOS: `~/Library/Application Support/claude/mcp/servers/emacs.json` (also try `.../Claude/...` depending on build)
+- Linux: `~/.config/claude/mcp/servers/emacs.json` (also try `~/.config/Claude/...`)
+
+Notes:
+- If you installed with pipx or a venv, set `"command"` to the absolute path from `which emacs-mcp-server` and remove the `args` field.
+- Ensure `stdio` is `true` (the CLI uses stdio to talk to MCP servers).
+- After adding, the CLI should list the Emacs tools; try listing buffers or evaluating a small form to verify.
 
 ### Configuration: Cursor
 Cursor also supports MCP servers.
