@@ -52,27 +52,16 @@ Confirm and manage:
 ```bash
 claude mcp list
 claude mcp get emacs
-claude mcp remove emacs   # to remove later
 ```
-
-Notes:
-- Keep `--transport stdio` (this server speaks stdio).
-- Ensure `emacsclient` is on your `PATH` (this server always runs `emacsclient`).
-- The server fails fast at startup if Emacs isn’t reachable; start Emacs (and its server) first.
-- Use `--timeout <seconds>` if you need a longer timeout.
 
 ### Configuration: Cursor
 Cursor also supports MCP servers.
 
 1) Open Cursor Settings and find the MCP Servers section.
-2) Add a new server:
+2) Add a new custom server:
    - **Name**: `emacs`
    - **Command** and **Args**: same options as described above for Claude Code
    - **Environment** (optional): same as above
    - **Stdio**: enabled
 
 After saving, ask Cursor to read the visible text in your current Emacs window or to evaluate a small form to confirm everything works.
-
-### Troubleshooting
-- **“emacsclient not found”**: Ensure Emacs is installed and the server is running. If needed, set `EMACSCLIENT` to the absolute path of `emacsclient`.
-- **Timeouts**: Increase `EMACSCLIENT_TIMEOUT` or launch with `--timeout <seconds>`.

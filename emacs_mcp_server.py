@@ -5,10 +5,11 @@ import asyncio
 import base64
 import contextlib
 import json
+import time
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Any, Dict, Tuple, List, Optional
+from typing import Any, Dict, Tuple, Optional
 
 from fastmcp import FastMCP
 
@@ -18,11 +19,6 @@ __version__ = "0.1.0"
 class EmacsError(RuntimeError):
     """Raised when an Emacs interaction fails in a recoverable way."""
     pass
-
-
-def _resolve_emacsclient() -> str:
-    # Always invoke the standard emacsclient from PATH
-    return "emacsclient"
 
 
 # Default timeout; overridable via CLI
@@ -37,7 +33,7 @@ def _get_timeout_seconds(override: float | None = None) -> float:
 
 def _run_emacsclient_eval(expr: str, timeout_seconds: float = 5.0) -> Tuple[str, str, int]:
     """Synchronous fallback runner (used only in smoke or legacy paths)."""
-    command = [_resolve_emacsclient(), "-e", expr]
+    command = ["emacsclient", "-e", expr]
     try:
         proc = subprocess.run(
             command,
@@ -63,7 +59,7 @@ async def _run_emacsclient_eval_async(
     expr: str, timeout_seconds: Optional[float] = None
 ) -> Tuple[str, str, int]:
     """Run emacsclient asynchronously and return (stdout, stderr, returncode)."""
-    command = [_resolve_emacsclient(), "-e", expr]
+    command = ["emacsclient", "-e", expr]
     try:
         process = await asyncio.create_subprocess_exec(
             *command,
@@ -109,26 +105,35 @@ class VisibleText:
     end: int
 
 
-def _eval_b64_json(elisp_data_expr: str, timeout_seconds: float = 5.0) -> Any:
-    elisp = f"""
-    (let* ((data {elisp_data_expr})
+def _elisp_b64_wrapper(data_expr: str) -> str:
+    """Wrap an Elisp expression producing data into a base64-encoded JSON string."""
+    return (
+        f"""
+    (let* ((data {data_expr})
            (json-str (progn (require 'json) (json-encode data)))
            (b64 (base64-encode-string json-str t)))
       b64)
     """.strip()
+    )
 
+
+def _decode_b64_json(possibly_quoted: str) -> Any:
+    # Emacs prints strings quoted; strip a single leading/trailing quote if present
+    if possibly_quoted.startswith('"') and possibly_quoted.endswith('"'):
+        emacs_string = possibly_quoted[1:-1]
+    else:
+        emacs_string = possibly_quoted
+    json_bytes = base64.b64decode(emacs_string)
+    return json.loads(json_bytes)
+
+
+def _eval_b64_json(elisp_data_expr: str, timeout_seconds: float = 5.0) -> Any:
+    elisp = _elisp_b64_wrapper(elisp_data_expr)
     stdout, stderr, code = _run_emacsclient_eval(elisp, timeout_seconds)
     if code != 0 or (stderr and not stdout):
         raise EmacsError(f"Emacs JSON eval error: {stderr or stdout}")
-
-    if stdout.startswith('"') and stdout.endswith('"'):
-        emacs_string = stdout[1:-1]
-    else:
-        emacs_string = stdout
-
     try:
-        json_bytes = base64.b64decode(emacs_string)
-        return json.loads(json_bytes)
+        return _decode_b64_json(stdout)
     except Exception as exc:
         raise EmacsError(f"Failed to decode Emacs JSON: {exc}") from exc
 
@@ -202,25 +207,12 @@ def get_context(timeout_seconds: float = 5.0) -> Dict[str, Any]:
 
 
 async def _eval_b64_json_async(elisp_data_expr: str, timeout_seconds: Optional[float] = None) -> Any:
-    elisp = f"""
-    (let* ((data {elisp_data_expr})
-           (json-str (progn (require 'json) (json-encode data)))
-           (b64 (base64-encode-string json-str t)))
-      b64)
-    """.strip()
-
+    elisp = _elisp_b64_wrapper(elisp_data_expr)
     stdout, stderr, code = await _run_emacsclient_eval_async(elisp, timeout_seconds)
     if code != 0 or (stderr and not stdout):
         raise EmacsError(f"Emacs JSON eval error: {stderr or stdout}")
-
-    if stdout.startswith('"') and stdout.endswith('"'):
-        emacs_string = stdout[1:-1]
-    else:
-        emacs_string = stdout
-
     try:
-        json_bytes = base64.b64decode(emacs_string)
-        return json.loads(json_bytes)
+        return _decode_b64_json(stdout)
     except Exception as exc:
         raise EmacsError(f"Failed to decode Emacs JSON: {exc}") from exc
 
@@ -300,13 +292,6 @@ async def get_context_async(timeout_seconds: Optional[float] = None) -> Dict[str
 app = FastMCP(name="emacs-mcp-server")
 
 
-@app.tool(
-    name="emacs_list_buffers",
-    description=(
-        "List open buffers with name, file path (if any), modified flag, and whether it is the current buffer. "
-        "Returns: {success: bool, buffers?: [...], error?: string}"
-    ),
-)
 async def emacs_list_buffers() -> Dict[str, Any]:
     """Return a list of open buffers and their basic metadata.
 
@@ -330,10 +315,6 @@ async def emacs_list_buffers() -> Dict[str, Any]:
         return {"success": False, "error": str(exc)}
 
 
-@app.tool(
-    name="emacs_eval",
-    description="Evaluate an Emacs Lisp expression and return its printed result.",
-)
 async def emacs_eval(expr: str) -> Dict[str, Any]:
     try:
         result = await evaluate_async(expr, None)
@@ -342,13 +323,6 @@ async def emacs_eval(expr: str) -> Dict[str, Any]:
         return {"success": False, "error": str(exc)}
 
 
-@app.tool(
-    name="emacs_get_visible_text",
-    description=(
-        "Get the text currently visible in the selected Emacs window. "
-        "Returns: {success: bool, text?: string, start?: number, end?: number, error?: string}"
-    ),
-)
 async def emacs_get_visible_text() -> Dict[str, Any]:
     try:
         # Prefer async path for consistency
@@ -358,13 +332,6 @@ async def emacs_get_visible_text() -> Dict[str, Any]:
         return {"success": False, "error": str(exc)}
 
 
-@app.tool(
-    name="emacs_get_context",
-    description=(
-        "Get contextual information about the Emacs state: buffer name, file name, mode, point, line/column, modified, narrowed, window start/end, project root, and list of buffers. "
-        "Returns: {success: bool, context?: {...}, error?: string}"
-    ),
-)
 async def emacs_get_context() -> Dict[str, Any]:
     try:
         ctx = await get_context_async(_get_timeout_seconds(None))
@@ -421,10 +388,7 @@ def main() -> None:
     ok = asyncio.run(_check_emacs_connection(_get_timeout_seconds(None)))
     if not ok:
         # Retry once after a short delay to smooth transient startup issues
-        try:
-            asyncio.run(asyncio.sleep(0.2))
-        except RuntimeError:
-            pass
+        time.sleep(0.2)
         ok = asyncio.run(_check_emacs_connection(_get_timeout_seconds(None)))
     if not ok:
         msg = (
@@ -432,6 +396,24 @@ def main() -> None:
         )
         print(msg, file=sys.stderr)
         sys.exit(1)
+
+    # Register tools just before running, to keep top-level functions importable in tests
+    app.tool(name="emacs_list_buffers", description=(
+        "List open buffers with name, file path (if any), modified flag, and whether it is the current buffer. "
+        "Returns: {success: bool, buffers?: [...], error?: string}"
+    ))(emacs_list_buffers)
+
+    app.tool(name="emacs_eval", description="Evaluate an Emacs Lisp expression and return its printed result.")(emacs_eval)
+
+    app.tool(name="emacs_get_visible_text", description=(
+        "Get the text currently visible in the selected Emacs window. "
+        "Returns: {success: bool, text?: string, start?: number, end?: number, error?: string}"
+    ))(emacs_get_visible_text)
+
+    app.tool(name="emacs_get_context", description=(
+        "Get contextual information about the Emacs state: buffer name, file name, mode, point, line/column, modified, narrowed, window start/end, project root, and list of buffers. "
+        "Returns: {success: bool, context?: {...}, error?: string}"
+    ))(emacs_get_context)
 
     app.run()
 
