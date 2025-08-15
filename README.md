@@ -35,29 +35,33 @@ emacs-mcp-server --smoke
 If `emacs-mcp-server` is not found after installation, ensure your pipx bin directory is on `PATH` and/or run `which emacs-mcp-server` to get the absolute path for use in client config.
 
 ### Configuration: Claude Code CLI
-Claude Code’s CLI can load MCP servers from simple JSON specs. Create a server spec named `emacs.json` with the command you prefer (uv or a direct binary):
+Use the `claude mcp add` command to register this server with the CLI.
 
-```json
-{
-  "name": "emacs",
-  "command": "uv",
-  "args": ["run", "emacs-mcp-server"],
-  "env": {
-    "EMACSCLIENT": "emacsclient",
-    "EMACSCLIENT_TIMEOUT": "5.0"
-  },
-  "stdio": true
-}
+- uv (recommended):
+```bash
+claude mcp add --scope user --transport stdio \
+  -e EMACSCLIENT=emacsclient -e EMACSCLIENT_TIMEOUT=5.0 \
+  emacs uv run emacs-mcp-server
 ```
 
-Place this file in the CLI’s MCP servers directory, then restart the CLI:
-- macOS: `~/Library/Application Support/claude/mcp/servers/emacs.json` (also try `.../Claude/...` depending on build)
-- Linux: `~/.config/claude/mcp/servers/emacs.json` (also try `~/.config/Claude/...`)
+- Direct binary (pipx/venv):
+```bash
+claude mcp add --scope user --transport stdio \
+  -e EMACSCLIENT=emacsclient -e EMACSCLIENT_TIMEOUT=5.0 \
+  emacs "$(which emacs-mcp-server)"
+```
+
+Confirm and manage:
+```bash
+claude mcp list
+claude mcp get emacs
+claude mcp remove emacs   # to remove later
+```
 
 Notes:
-- If you installed with pipx or a venv, set `"command"` to the absolute path from `which emacs-mcp-server` and remove the `args` field.
-- Ensure `stdio` is `true` (the CLI uses stdio to talk to MCP servers).
-- After adding, the CLI should list the Emacs tools; try listing buffers or evaluating a small form to verify.
+- Keep `--transport stdio` (this server speaks stdio).
+- If `emacsclient` is not on your `PATH`, set `-e EMACSCLIENT=/absolute/path/to/emacsclient`.
+- The server fails fast at startup if Emacs isn’t reachable; start Emacs (and its server) first.
 
 ### Configuration: Cursor
 Cursor also supports MCP servers.
