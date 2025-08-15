@@ -20,7 +20,7 @@ Verify your Emacs connection:
 uv run emacs-mcp-server --smoke
 ```
 
-Run the server (for MCP clients that launch it for you, see config below; you can also run it manually to test):
+Run the server (for MCP clients that launch it for you, see config below; you can also run it manually to test). It will fail fast if Emacs isn’t reachable:
 ```bash
 uv run emacs-mcp-server
 ```
@@ -67,4 +67,4 @@ After saving, ask Cursor to read the visible text in your current Emacs window o
 
 ### Troubleshooting
 - **“emacsclient not found”**: Ensure Emacs is installed and the server is running. If needed, set `EMACSCLIENT` to the absolute path of `emacsclient`.
-- **Timeouts**: Increase `EMACSCLIENT_TIMEOUT` or launch with `--timeout <seconds>`. You can also add `--strict-startup` to fail fast if Emacs isn’t reachable during startup.
+- **Timeouts**: Increase `EMACSCLIENT_TIMEOUT` or launch with `--timeout <seconds>`.

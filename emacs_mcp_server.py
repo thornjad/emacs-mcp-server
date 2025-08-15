@@ -405,7 +405,6 @@ async def _check_emacs_connection(timeout_seconds: Optional[float] = None) -> bo
 def main() -> None:
     parser = argparse.ArgumentParser(description="Emacs MCP Server")
     parser.add_argument("--smoke", action="store_true", help="Run a quick smoke check and exit")
-    parser.add_argument("--strict-startup", action="store_true", help="Fail fast if Emacs is not reachable at startup")
     parser.add_argument("--timeout", type=float, default=None, help="Timeout (seconds) for emacsclient operations; overrides EMACSCLIENT_TIMEOUT")
     args = parser.parse_args()
 
@@ -418,8 +417,7 @@ def main() -> None:
         smoke()
         return
 
-    # Optional startup connectivity check
-    # Optional startup connectivity check with brief retry
+    # Startup connectivity check with brief retry (fail fast by default)
     ok = asyncio.run(_check_emacs_connection(_get_timeout_seconds(None)))
     if not ok:
         # Retry once after a short delay to smooth transient startup issues
@@ -430,11 +428,10 @@ def main() -> None:
         ok = asyncio.run(_check_emacs_connection(_get_timeout_seconds(None)))
     if not ok:
         msg = (
-            "Warning: cannot connect to Emacs. Ensure Emacs is running, the server is started, and emacsclient is on PATH."
+            "Error: cannot connect to Emacs. Ensure Emacs is running, the server is started, and emacsclient is on PATH."
         )
         print(msg, file=sys.stderr)
-        if args.strict_startup:
-            sys.exit(1)
+        sys.exit(1)
 
     app.run()
 
