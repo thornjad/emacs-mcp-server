@@ -5,7 +5,6 @@ import asyncio
 import base64
 import contextlib
 import json
-import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -26,8 +25,8 @@ def _resolve_emacsclient() -> str:
     return "emacsclient"
 
 
-# Default timeout can be overridden via env and CLI
-_DEFAULT_TIMEOUT_SECONDS: float = float(os.environ.get("EMACSCLIENT_TIMEOUT", "5.0"))
+# Default timeout; overridable via CLI
+_DEFAULT_TIMEOUT_SECONDS: float = 5.0
 
 
 def _get_timeout_seconds(override: float | None = None) -> float:
@@ -406,7 +405,7 @@ async def _check_emacs_connection(timeout_seconds: Optional[float] = None) -> bo
 def main() -> None:
     parser = argparse.ArgumentParser(description="Emacs MCP Server")
     parser.add_argument("--smoke", action="store_true", help="Run a quick smoke check and exit")
-    parser.add_argument("--timeout", type=float, default=None, help="Timeout (seconds) for emacsclient operations; overrides EMACSCLIENT_TIMEOUT")
+    parser.add_argument("--timeout", type=float, default=None, help="Timeout (seconds) for emacsclient operations")
     args = parser.parse_args()
 
     # Apply CLI timeout override
