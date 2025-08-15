@@ -4,7 +4,7 @@ A small MCP server that lets Claude Code and Cursor talk to your running Emacs v
 
 ### Requirements
 - **Emacs** with the server enabled (e.g., add `(server-start)` to your init, or run `emacs --daemon`).
-- **emacsclient** on your `PATH` (usually included with Emacs). If it is not, you can point to it with the `EMACSCLIENT` environment variable.
+- **emacsclient** on your `PATH` (usually included with Emacs).
 - **Python 3.12**.
 
 ### Quick install (recommended)
@@ -40,14 +40,14 @@ Use the `claude mcp add` command to register this server with the CLI.
 - uv (recommended):
 ```bash
 claude mcp add --scope user --transport stdio \
-  -e EMACSCLIENT=emacsclient -e EMACSCLIENT_TIMEOUT=5.0 \
+  -e EMACSCLIENT_TIMEOUT=5.0 \
   emacs uv run emacs-mcp-server
 ```
 
 - Direct binary (pipx/venv):
 ```bash
 claude mcp add --scope user --transport stdio \
-  -e EMACSCLIENT=emacsclient -e EMACSCLIENT_TIMEOUT=5.0 \
+  -e EMACSCLIENT_TIMEOUT=5.0 \
   emacs "$(which emacs-mcp-server)"
 ```
 
@@ -60,7 +60,7 @@ claude mcp remove emacs   # to remove later
 
 Notes:
 - Keep `--transport stdio` (this server speaks stdio).
-- If `emacsclient` is not on your `PATH`, set `-e EMACSCLIENT=/absolute/path/to/emacsclient`.
+- Ensure `emacsclient` is on your `PATH` (this server always runs `emacsclient`).
 - The server fails fast at startup if Emacs isn’t reachable; start Emacs (and its server) first.
 
 ### Configuration: Cursor

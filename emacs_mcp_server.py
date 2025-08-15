@@ -22,7 +22,8 @@ class EmacsError(RuntimeError):
 
 
 def _resolve_emacsclient() -> str:
-    return os.environ.get("EMACSCLIENT", "emacsclient")
+    # Always invoke the standard emacsclient from PATH
+    return "emacsclient"
 
 
 # Default timeout can be overridden via env and CLI
@@ -49,7 +50,7 @@ def _run_emacsclient_eval(expr: str, timeout_seconds: float = 5.0) -> Tuple[str,
         )
     except FileNotFoundError as exc:
         raise EmacsError(
-            "emacsclient not found. Install Emacs or set EMACSCLIENT env var to its path."
+            "emacsclient not found. Install Emacs and ensure 'emacsclient' is on PATH."
         ) from exc
     except subprocess.TimeoutExpired as exc:
         raise EmacsError("emacsclient request timed out") from exc
@@ -72,7 +73,7 @@ async def _run_emacsclient_eval_async(
         )
     except FileNotFoundError as exc:
         raise EmacsError(
-            "emacsclient not found. Install Emacs or set EMACSCLIENT env var to its path."
+            "emacsclient not found. Install Emacs and ensure 'emacsclient' is on PATH."
         ) from exc
 
     timeout = _get_timeout_seconds(timeout_seconds)
