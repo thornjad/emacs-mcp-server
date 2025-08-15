@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling>=1.18.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "emacs-mcp-server"
+version = "0.1.0"
+description = "An MCP server for controlling Emacs via emacsclient (non-interactive commands)"
+authors = [
+  { name = "Emacs MCP Server" }
+]
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastmcp>=0.4.0",
+]
+keywords = ["mcp", "emacs", "emacsclient", "fastmcp", "model-context-protocol"]
+
+[project.urls]
+Homepage = "https://example.local/emacs-mcp-server"
+
+[project.scripts]
+emacs-mcp-server = "emacs_mcp_server:main"
