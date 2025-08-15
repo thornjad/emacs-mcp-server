@@ -13,10 +13,11 @@ def test_base64_json_malformed(monkeypatch):
 
     monkeypatch.setattr(srv, "_run_emacsclient_eval", fake_eval)
     try:
-        srv.get_visible_text()
+        # Test with evaluate which uses sync path for smoke test
+        srv._eval_b64_json("(list (cons 'test \"value\"))")
         assert False, "Expected EmacsError on malformed base64"
-    except srv.EmacsError:
-        pass
+    except srv.EmacsError as e:
+        assert "Failed to decode" in str(e)
 
 
 @pytest.mark.asyncio
@@ -26,7 +27,7 @@ async def test_emacsclient_timeout(monkeypatch):
 
     monkeypatch.setattr(srv, "_run_emacsclient_eval_async", fake_run)
 
-    resp = await srv.emacs_get_visible_text()
+    resp = await srv.emacs_get_visible_text.fn()
     assert resp["success"] is False and "timed out" in resp["error"].lower()
 
 
@@ -48,7 +49,7 @@ async def test_tool_emacs_eval_error_envelope(monkeypatch):
 
     monkeypatch.setattr(srv, "_run_emacsclient_eval_async", fake_run)
 
-    resp = await srv.emacs_eval("(undefined)")
+    resp = await srv.emacs_eval.fn("(undefined)")
     assert resp["success"] is False
     assert "error" in resp
 
@@ -62,7 +63,7 @@ async def test_visible_text_tool_success(monkeypatch):
 
     monkeypatch.setattr(srv, "_eval_b64_json_async", fake_eval_b64)
 
-    resp = await srv.emacs_get_visible_text()
+    resp = await srv.emacs_get_visible_text.fn()
     assert resp["success"] is True
     assert resp["text"] == "Hello"
     assert resp["start"] == 1 and resp["end"] == 6
@@ -77,7 +78,7 @@ async def test_context_tool_success(monkeypatch):
 
     monkeypatch.setattr(srv, "_eval_b64_json_async", fake_eval_b64)
 
-    resp = await srv.emacs_get_context()
+    resp = await srv.emacs_get_context.fn()
     assert resp["success"] is True
     assert resp["context"]["buffer_name"] == "test.py"
     assert resp["context"]["project_root"] == "/tmp/proj"
