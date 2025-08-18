@@ -7,7 +7,7 @@ A small MCP server that lets Claude Code and Cursor talk to your running Emacs v
 - **Python 3.12**.
 
 ### Quick install (recommended)
-Install and run with uvx:
+Install and run with [uvx](https://docs.astral.sh/uv/guides/tools/) (part of uv):
 ```bash
 uvx --from git+https://github.com/thornjad/emacs-mcp-server.git emacs-mcp-server --smoke
 ```
