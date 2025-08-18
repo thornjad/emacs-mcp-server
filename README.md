@@ -9,12 +9,12 @@ A small MCP server that lets Claude Code and Cursor talk to your running Emacs v
 ### Quick install (recommended)
 Install and run with uvx:
 ```bash
-uvx --from . emacs-mcp-server --smoke
+uvx --from git+https://github.com/thornjad/emacs-mcp-server.git emacs-mcp-server --smoke
 ```
 
 Run the server (for MCP clients that launch it for you, see config below; you can also run it manually to test). It will fail fast if Emacs isn't reachable:
 ```bash
-uvx --from . emacs-mcp-server
+uvx --from git+https://github.com/thornjad/emacs-mcp-server.git emacs-mcp-server
 ```
 
 ### Alternative install (development)
@@ -32,7 +32,7 @@ Use the `claude mcp add` command to register this server with the CLI.
 - uvx (recommended):
 ```bash
 claude mcp add --scope user --transport stdio \
-  emacs uvx --from /path/to/emacs-mcp-server emacs-mcp-server
+  emacs uvx --from git+https://github.com/thornjad/emacs-mcp-server.git emacs-mcp-server
 ```
 
 - Development (uv):
