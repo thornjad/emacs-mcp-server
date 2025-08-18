@@ -7,45 +7,38 @@ A small MCP server that lets Claude Code and Cursor talk to your running Emacs v
 - **Python 3.12**.
 
 ### Quick install (recommended)
-macOS:
+Install and run with uvx:
+```bash
+uvx --from . emacs-mcp-server --smoke
+```
+
+Run the server (for MCP clients that launch it for you, see config below; you can also run it manually to test). It will fail fast if Emacs isn't reachable:
+```bash
+uvx --from . emacs-mcp-server
+```
+
+### Alternative install (development)
+For development or if you need to modify the code:
 ```bash
 brew install uv
 uv venv -p 3.12
 uv sync
-```
-
-[Optional] Verify your Emacs connection:
-```bash
 uv run emacs-mcp-server --smoke
 ```
-
-Run the server (for MCP clients that launch it for you, see config below; you can also run it manually to test). It will fail fast if Emacs isn’t reachable:
-```bash
-uv run emacs-mcp-server
-```
-
-### Alternative install (pipx)
-If you prefer a standalone binary-like install:
-```bash
-pipx install .
-# Then verify
-emacs-mcp-server --smoke
-```
-If `emacs-mcp-server` is not found after installation, ensure your pipx bin directory is on `PATH` and/or run `which emacs-mcp-server` to get the absolute path for use in client config.
 
 ### Configuration: Claude Code CLI
 Use the `claude mcp add` command to register this server with the CLI.
 
-- uv (recommended):
+- uvx (recommended):
+```bash
+claude mcp add --scope user --transport stdio \
+  emacs uvx --from /path/to/emacs-mcp-server emacs-mcp-server
+```
+
+- Development (uv):
 ```bash
 claude mcp add --scope user --transport stdio \
   emacs uv run emacs-mcp-server
-```
-
-- Direct binary (pipx/venv):
-```bash
-claude mcp add --scope user --transport stdio \
-  emacs "$(which emacs-mcp-server)"
 ```
 
 Confirm and manage:
